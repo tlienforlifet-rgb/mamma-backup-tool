@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MAMMA v266 Backup</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#101c1b;color:#f4f5ef;max-width:680px;margin:auto;padding:25px 18px}h1{font-size:25px}p{line-height:1.7;color:#c9d7d1}button{font-size:16px;padding:14px 18px;border:0;border-radius:12px;background:#c4e8c9;color:#112019;margin:8px 8px 8px 0;font-weight:700}button:disabled{opacity:.45}pre{white-space:pre-wrap;word-break:break-word;background:#21332f;padding:15px;border-radius:12px;max-height:320px;overflow:auto}small{color:#b6c6bf}a{color:#c4e8c9}</style></head><body>
+<h1>MAMMA v266 バックアップ</h1><p>iPhone Safari向け。まず1ファイルの取得を検証し、成功した場合のみ一括ZIPを作成します。取得したデータはこの端末内で処理し、外部サーバーには送信しません。</p>
+<button id="test">① 取得テスト</button><button id="backup" disabled>② ZIPを作成</button><pre id="log">準備完了。まず取得テストを押してください。</pre>
+<p><small>注意: アーカイブ側がCORSを許可していない場合、このページでは取得できません。認証情報が含まれる可能性のあるソースは公開せず、ZIPも共有前に確認してください。SafariでZIPを保存した後、このチャットに添付してください。</small></p>
+<script>
+const BASE='https://mamma-v110-review.happymyna5.chatgpt.site/';
+const log=document.getElementById('log'),test=document.getElementById('test'),backup=document.getElementById('backup');
+let sources=[];
+function say(s){log.textContent+='\n'+s;}
+async function get(u){const r=await fetch(u,{credentials:'omit',mode:'cors'});if(!r.ok)throw Error('HTTP '+r.status+' '+u);return r;}
+function entries(data){return (Array.isArray(data.sources)?data.sources:[]).map(s=>({path:typeof s==='string'?s:(s.url||s.path||''),name:typeof s==='string'?s:(s.path||s.name||s.url||'')})).filter(x=>x.path).map(x=>({url:new URL(x.path,BASE).href,name:x.name.replace(/^current-source\/v\d+\//,'').replace(/^\//,'')}));}
+test.onclick=async()=>{test.disabled=true;log.textContent='JSONを確認中…';try{const j=await(await get(BASE+'current.json')).json();sources=entries(j);if(!sources.length)throw Error('sources が見つかりません');say('ソース項目: '+sources.length);const r=await get(sources[0].url);const t=await r.text();if(!t.trim())throw Error('取得内容が空です');say('成功: '+sources[0].name+' ('+t.length+'文字)');backup.disabled=false;}catch(e){say('取得失敗: '+e.message+'\nSafariのサイト間アクセス制限の可能性があります。この画面をスクリーンショットで送ってください。');}finally{test.disabled=false;}};
+backup.onclick=async()=>{backup.disabled=true;log.textContent='ZIP準備中…';try{if(!window.JSZip){say('ZIPライブラリを読み込み中…');await new Promise((resolve,reject)=>{let s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';s.onload=resolve;s.onerror=()=>reject(Error('ZIPライブラリを読み込めません'));document.head.appendChild(s);});}
+const zip=new JSZip();let ok=0,failed=[];for(const s of sources){try{const r=await get(s.url);zip.file(s.name,await r.blob());ok++;say(ok+'/'+sources.length+' '+s.name);}catch(e){failed.push(s.name+': '+e.message);}}
+zip.file('BACKUP_REPORT.txt','Source archive: '+BASE+'\nSuccess: '+ok+'\nFailed:\n'+failed.join('\n'));if(!ok)throw Error('取得成功ファイルがありません');say('ZIP作成中…');const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:4}});const a=document.createElement('a');const url=URL.createObjectURL(blob);a.href=url;a.download='MAMMA-v266-source-backup.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);say('完了: '+ok+'/'+sources.length+' ファイル。失敗: '+failed.length);}catch(e){say('失敗: '+e.message);}finally{backup.disabled=false;}};
+</script></body></html>
